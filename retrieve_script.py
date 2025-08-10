@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Lock
 import signal
 import sys
+from typing import Optional
 
 # Constants
 BASE_TEMPLATE = "https://www.examtopics.com/discussions/splunk/view/{uid}-exam-splk-1003-topic-1-question-{qnum}-discussion/"
@@ -17,8 +18,18 @@ output_lock = Lock()
 stop_requested = False
 
 
-# Logging setup
-def setup_logger(name, path, level):
+def setup_logger(name: str, path: str, level: int) -> logging.Logger:
+    """
+    Create and configure a logger.
+
+    Args:
+        name (str): Name of the logger.
+        path (str): File path for the log file.
+        level (int): Logging level.
+
+    Returns:
+        logging.Logger: Configured logger instance.
+    """
     handler = logging.FileHandler(path, mode="w")
     handler.setFormatter(logging.Formatter("%(asctime)s - %(message)s"))
     logger = logging.getLogger(name)
@@ -32,8 +43,14 @@ valid_logger = setup_logger("valid", "valid_urls.log", logging.INFO)
 bad_logger = setup_logger("bad", "bad_requests.log", logging.WARNING)
 
 
-# Handle Ctrl+C
-def signal_handler(sig, frame):
+def signal_handler(sig: int, frame) -> None:
+    """
+    Handle Ctrl+C (SIGINT) for graceful shutdown.
+
+    Args:
+        sig (int): Signal number.
+        frame: Current stack frame.
+    """
     global stop_requested
     print("Gracefully stopping... (Ctrl+C again to force quit)")
     stop_requested = True
@@ -42,7 +59,17 @@ def signal_handler(sig, frame):
 signal.signal(signal.SIGINT, signal_handler)
 
 
-def check_url(uid, qnum):
+def check_url(uid: int, qnum: int) -> Optional[str]:
+    """
+    Check if a given URL exists and is valid.
+
+    Args:
+        uid (int): Unique identifier in the URL.
+        qnum (int): Question number in the URL.
+
+    Returns:
+        Optional[str]: The valid URL if found, otherwise None.
+    """
     if stop_requested:
         return None
     url = BASE_TEMPLATE.format(uid=uid, qnum=qnum)
@@ -61,7 +88,13 @@ def check_url(uid, qnum):
     return None
 
 
-def find_valid_url_for_question(qnum):
+def find_valid_url_for_question(qnum: int) -> None:
+    """
+    Search for a valid URL for a specific question number.
+
+    Args:
+        qnum (int): Question number to search for.
+    """
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         futures = {executor.submit(check_url, uid, qnum): uid for uid in UID_RANGE}
         for future in as_completed(futures):
@@ -69,19 +102,40 @@ def find_valid_url_for_question(qnum):
                 break
             result = future.result()
             if result:
-                # Cancel remaining futures
+                # Cancel remaining futures once a valid URL is found
                 for f in futures:
                     f.cancel()
-                return  # move to next question immediately
+                return
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """
+    Main entry point of the script.
+    Parses command-line arguments and searches for valid URLs.
+    """
+    start_qnum = 1
+    if len(sys.argv) > 1:
+        try:
+            arg_val = int(sys.argv[1])
+            if arg_val > 0:
+                start_qnum = arg_val
+            else:
+                print("Error: Starting question number must be a positive integer.")
+                sys.exit(1)
+        except ValueError:
+            print("Error: Invalid argument. Please provide a positive integer.")
+            sys.exit(1)
+
     try:
-        for qnum in range(1, QUESTION_COUNT + 1):
+        for qnum in range(start_qnum, QUESTION_COUNT + 1):
             if stop_requested:
                 break
-            print(f"\Searching for Question {qnum}...")
+            print(f"Searching for Question {qnum}...")
             find_valid_url_for_question(qnum)
     except KeyboardInterrupt:
         print("Script interrupted.")
         sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
