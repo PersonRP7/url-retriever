@@ -44,7 +44,12 @@ valid_logger = setup_logger("valid", "valid_urls.log", logging.INFO)
 
 
 def signal_handler(sig: int, frame) -> None:
-    """Handle Ctrl+C (SIGINT) for graceful shutdown."""
+    """
+    Handle Ctrl+C (SIGINT) for graceful shutdown.
+    Args:
+        sig (int): Signal number.
+        frame: Current stack frame.
+    """
     global stop_requested
     print("Gracefully stopping... (Ctrl+C again to force quit)")
     stop_requested = True
@@ -83,7 +88,11 @@ def check_url(uid: int, qnum: int) -> Optional[str]:
 
 
 def find_valid_url_for_question(qnum: int) -> None:
-    """Search for a valid URL for a specific question number."""
+    """
+    Search for a valid URL for a specific question number.
+    Args:
+        qnum (int): Question number to search for.
+    """
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         futures = {executor.submit(check_url, uid, qnum): uid for uid in UID_RANGE}
         for future in as_completed(futures):
@@ -98,7 +107,10 @@ def find_valid_url_for_question(qnum: int) -> None:
 
 
 def main() -> None:
-    """Main entry point of the script."""
+    """
+    Main entry point of the script.
+    Parses command-line arguments and searches for valid URLs.
+    """
     start_qnum = 1
     if len(sys.argv) > 1:
         try:
